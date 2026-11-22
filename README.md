@@ -50,6 +50,7 @@ Segue [SemVer](https://semver.org/lang/pt-BR/). Cada versão tem uma tag `vX.Y.Z
 
 | Versão | Novidades |
 | ------ | --------- |
+| 0.3.1 | Radar não desliga com o gravador/Game Turbo; aviso de ativo; diagnóstico |
 | 0.3.0 | Radar via Acessibilidade (funciona junto com a gravação de tela), liga sozinho com o jogo, escala mais precisa |
 | 0.2.0 | Radar sobre o mapa do jogo: botão só com o mapa aberto, filtros com ícones, marcadores alinhados |
 | 0.1.0 | Primeira versão: mapa flutuante, transparência, modo fantasma |
