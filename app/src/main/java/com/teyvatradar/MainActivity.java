@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
     TextView status, dataStatus;
     Button dataBtn, a11yBtn, toggleBtn, overlayBtn, notifBtn;
     boolean downloading;
+    TextView diag;
 
     int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -91,6 +92,14 @@ public class MainActivity extends Activity {
                 "Pode gravar a tela normalmente: este modo não usa o recurso de gravação.\n\n" +
                 "Para tirar as marcações: abra o mapa, toque no botão e use “Limpar filtros”.", 14, TEXT));
 
+        col.addView(label("Diagnóstico"));
+        diag = text("", 12, MUTED);
+        diag.setTypeface(android.graphics.Typeface.MONOSPACE);
+        col.addView(diag);
+        button(col, "Atualizar diagnóstico", new View.OnClickListener() {
+            public void onClick(View v) { refresh(); }
+        });
+
         col.addView(label("Modo alternativo (captura de tela)"));
         col.addView(text("Só use se não conseguir ativar a acessibilidade. Neste modo, gravar a tela pausa o radar " +
                 "(o Android só permite uma captura por vez); depois é só tocar em “toque para religar”.", 13, MUTED));
@@ -136,6 +145,9 @@ public class MainActivity extends Activity {
                 checkSelfPermission("android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED;
         overlayBtn.setText((ov ? "✔ " : "") + "Permitir “Exibir sobre outros apps”");
         notifBtn.setText((nt ? "✔ " : "") + "Permitir notificação");
+        RadarA11yService svc = RadarA11yService.instance;
+        diag.setText("Versão " + BuildConfigVersion() + "\nAcessibilidade: " + (svc != null ? "conectada" : "desligada") + "\n"
+                + (svc != null ? svc.diagnostics() : ""));
         if (!data.isReady()) status.setText("○ Falta baixar os dados do mapa");
         else if (a11y && on) status.setText("● Radar pronto (acessibilidade)");
         else if (a11y) status.setText("○ Radar desligado");
@@ -242,6 +254,10 @@ public class MainActivity extends Activity {
         lp.topMargin = dp(8);
         parent.addView(b, lp);
         return b;
+    }
+
+    String BuildConfigVersion() {
+        try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception e) { return "?"; }
     }
 
     void toast(String s) { Toast.makeText(this, s, Toast.LENGTH_LONG).show(); }

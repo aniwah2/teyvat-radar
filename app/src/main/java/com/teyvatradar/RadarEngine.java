@@ -139,16 +139,21 @@ public class RadarEngine {
 
     /** Chamar na thread "worker" com uma captura em cinza (altura CAP_H). */
     public void process(Mat g) {
+        frames++;
+        lastW = g.cols(); lastH = g.rows();
         if (!ready || panelOpen || destroyed) return;
         if (g.cols() < g.rows()) { setMapOpen(false); return; }   // retrato: o jogo nao esta na tela
-        boolean open = locator.mapOpenScore(g) > 0.75;
+        double score = locator.mapOpenScore(g);
+        lastScore = score;
+        boolean open = score > 0.75;
         if (open) { openStreak++; closedStreak = 0; } else { closedStreak++; openStreak = 0; }
         if (!mapOpen && openStreak >= 2) setMapOpen(true);
         if (mapOpen && closedStreak >= 2) setMapOpen(false);
         if (!mapOpen || !open || selected.isEmpty()) return;
 
         double k = locator.scaleFromKnob(g);
-        if (k <= 0) { miss(); return; }
+        lastK = k;
+        if (k <= 0) { miss(); lastLocate = "barra de zoom não encontrada"; return; }
         Mat mask = MapLocator.uiMask(g.rows(), g.cols());
         // nossos proprios icones aparecem na captura: nao podem confundir o reconhecimento
         float[] d = markers.drawnCap;
@@ -165,7 +170,8 @@ public class RadarEngine {
         }
         if (p == null) p = locator.locate(g, mask, k, null);
         mask.release();
-        if (p == null) { miss(); return; }
+        if (p == null) { miss(); lastLocate = "posição não encontrada"; return; }
+        lastLocate = "ok (" + p.votes + " votos)";
         missStreak = 0;
         pose = p;
         final MapLocator.Pose fp = p;
@@ -176,6 +182,33 @@ public class RadarEngine {
             showMarkers(true);
         } });
         prefs.edit().putFloat("lx", (float) p.cx).putFloat("ly", (float) p.cy).apply();
+    }
+
+    volatile int frames, lastW, lastH;
+    volatile double lastScore = -1, lastK = -1;
+    volatile String lastLocate = "-";
+
+    public String diagnostics() {
+        return "Dados carregados: " + (ready ? "sim" : (loading ? "carregando" : "NÃO")) + "\n"
+                + "Quadros analisados: " + frames + " (" + lastW + "x" + lastH + ")\n"
+                + String.format(java.util.Locale.ROOT, "Mapa aberto: %s (semelhança %.2f)%n", mapOpen ? "sim" : "não", lastScore)
+                + String.format(java.util.Locale.ROOT, "Escala: %.2f | Localização: %s%n", lastK, lastLocate)
+                + "Itens filtrados: " + selected.size();
+    }
+
+    /** Aviso curto "Teyvat Radar ativo" ao entrar no jogo. */
+    public void flashActive() {
+        main.post(new Runnable() { public void run() {
+            if (pillShown || buttonShown) return;
+            pill.setText("\u2694  Teyvat Radar ativo \u00B7 abra o mapa");
+            Rect b = wm.getMaximumWindowMetrics().getBounds();
+            pillLp.x = dp(4);
+            pillLp.y = (int) (Math.min(b.width(), b.height()) * 0.30f);
+            addSafe(pill, pillLp);
+            main.postDelayed(new Runnable() { public void run() {
+                if (!pillShown) removeSafe(pill);
+            } }, 3500);
+        } });
     }
 
     MapLocator.Pose lastSavedPose() {
@@ -219,6 +252,7 @@ public class RadarEngine {
         main.post(new Runnable() { public void run() {
             if (on) {
                 hideAll();
+                pill.setText("\u23F8  Radar pausado \u00B7 toque para religar");
                 Rect b = wm.getMaximumWindowMetrics().getBounds();
                 pillLp.x = dp(4);
                 pillLp.y = (int) (Math.min(b.width(), b.height()) * 0.30f);

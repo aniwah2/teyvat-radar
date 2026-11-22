@@ -28,6 +28,7 @@ public class RadarA11yService extends AccessibilityService {
 
     static final String TAG = "TeyvatRadar";
     static final long INTERVAL_MS = 350;          // o Android limita a ~3 capturas por segundo
+    static final long IDLE_MS = 2500;
     static final String[] GENSHIN = {"com.miHoYo.GenshinImpact", "com.miHoYo.Yuanshen"};
 
     public static volatile RadarA11yService instance;
@@ -36,6 +37,8 @@ public class RadarA11yService extends AccessibilityService {
     SharedPreferences prefs;
     volatile boolean gameOnTop = false, shooting;
     String homePkg;
+    volatile String lastEvent = "";
+    volatile int shotsOk, shotsFail, lastFailCode = -1;
     final Map<String, Boolean> isApp = new HashMap<>();
     Executor exec;
     int failures;
@@ -64,27 +67,42 @@ public class RadarA11yService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent e) {
         if (e == null || e.getEventType() != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || e.getPackageName() == null) return;
         String pkg = e.getPackageName().toString();
+        String cls = e.getClassName() != null ? e.getClassName().toString() : "";
+        lastEvent = pkg + "/" + cls;
         boolean genshin = false;
         for (String g : GENSHIN) if (g.equals(pkg)) genshin = true;
         if (genshin) {
-            if (!gameOnTop) { gameOnTop = true; schedule(100); }
-        } else if (!pkg.equals(getPackageName()) && isLauncherApp(pkg)) {
-            // outro app de verdade veio para a frente (ignora teclado, barra de notificacao, etc.)
+            if (!gameOnTop) {
+                gameOnTop = true;
+                failures = 0;
+                if (engine != null) engine.flashActive();
+                schedule(100);
+            }
+        } else if (!pkg.equals(getPackageName()) && isRealAppScreen(pkg, cls)) {
+            // outro app abriu uma TELA de verdade. Janelas flutuantes (gravador, Game Turbo,
+            // bolhas, teclado, notificacoes) nao contam.
             if (gameOnTop) { gameOnTop = false; if (engine != null) engine.hideAll(); }
         }
     }
 
-    boolean isLauncherApp(String pkg) {
-        Boolean b = isApp.get(pkg);
+    /** True se (pkg, cls) e uma Activity (tela cheia de um app), ou a tela inicial. */
+    boolean isRealAppScreen(String pkg, String cls) {
+        String key = pkg + "/" + cls;
+        Boolean b = isApp.get(key);
         if (b == null) {
             if (homePkg == null) {
                 android.content.pm.ResolveInfo ri = getPackageManager().resolveActivity(
                         new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0);
                 homePkg = ri != null && ri.activityInfo != null ? ri.activityInfo.packageName : "";
             }
-            b = pkg.equals(homePkg) || (getPackageManager().getLaunchIntentForPackage(pkg) != null
-                    && !pkg.equals("com.android.systemui"));
-            isApp.put(pkg, b);
+            boolean activity = false;
+            if (!cls.isEmpty()) {
+                try {
+                    activity = getPackageManager().getActivityInfo(new android.content.ComponentName(pkg, cls), 0) != null;
+                } catch (Exception ignored) { }
+            }
+            b = activity && !pkg.equals("com.android.systemui");
+            isApp.put(key, b);
         }
         return b;
     }
@@ -97,7 +115,7 @@ public class RadarA11yService extends AccessibilityService {
 
     final Runnable shot = new Runnable() {
         public void run() {
-            if (engine == null || !gameOnTop || !enabledByUser(prefs) || shooting) return;
+            if (engine == null || !enabledByUser(prefs) || shooting) return;
             if (!engine.ready) { schedule(1000); return; }
             if (engine.panelOpen) { schedule(INTERVAL_MS); return; }
             shooting = true;
@@ -106,8 +124,15 @@ public class RadarA11yService extends AccessibilityService {
                 takeScreenshot(Display.DEFAULT_DISPLAY, exec, new TakeScreenshotCallback() {
                     @Override public void onSuccess(ScreenshotResult r) {
                         failures = 0;
+                        shotsOk++;
                         try {
                             Mat g = toGray(r);
+                            if (g != null && g.cols() < g.rows() && displayIsLandscape()) {
+                                Mat rot = new Mat();
+                                org.opencv.core.Core.rotate(g, rot, rotationGuess);
+                                g.release();
+                                g = rot;
+                            }
                             if (g != null) {
                                 engine.process(g);
                                 g.release();
@@ -116,12 +141,18 @@ public class RadarA11yService extends AccessibilityService {
                             Log.e(TAG, "process", e);
                         }
                         shooting = false;
-                        schedule(Math.max(0, INTERVAL_MS - (SystemClock.uptimeMillis() - t0)));
+                        // rapido com o jogo na frente; devagar fora dele (rede de seguranca:
+                        // se o mapa aparecer sem o aviso do Android, o radar acorda sozinho)
+                        if (!gameOnTop && engine.mapOpen) gameOnTop = true;
+                        long iv = gameOnTop ? INTERVAL_MS : IDLE_MS;
+                        schedule(Math.max(0, iv - (SystemClock.uptimeMillis() - t0)));
                     }
                     @Override public void onFailure(int code) {
                         shooting = false;
                         failures++;
-                        schedule(failures > 5 ? 2000 : INTERVAL_MS);   // tela desligada etc.
+                        shotsFail++;
+                        lastFailCode = code;
+                        schedule(failures > 5 || !gameOnTop ? IDLE_MS : INTERVAL_MS);   // tela desligada etc.
                     }
                 });
             } catch (Throwable e) {
@@ -131,6 +162,32 @@ public class RadarA11yService extends AccessibilityService {
             }
         }
     };
+
+    int rotationGuess = org.opencv.core.Core.ROTATE_90_COUNTERCLOCKWISE;
+
+    boolean displayIsLandscape() {
+        try {
+            android.hardware.display.DisplayManager dm = getSystemService(android.hardware.display.DisplayManager.class);
+            int r = dm.getDisplay(Display.DEFAULT_DISPLAY).getRotation();
+            rotationGuess = r == android.view.Surface.ROTATION_270
+                    ? org.opencv.core.Core.ROTATE_90_CLOCKWISE : org.opencv.core.Core.ROTATE_90_COUNTERCLOCKWISE;
+            return r == android.view.Surface.ROTATION_90 || r == android.view.Surface.ROTATION_270;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Texto de diagnostico mostrado no app. */
+    public String diagnostics() {
+        StringBuilder b = new StringBuilder();
+        b.append("Jogo na tela: ").append(gameOnTop ? "sim" : "não").append('\n');
+        b.append("Último evento: ").append(lastEvent).append('\n');
+        b.append("Capturas: ").append(shotsOk).append(" ok, ").append(shotsFail).append(" falhas");
+        if (lastFailCode >= 0) b.append(" (código ").append(lastFailCode).append(')');
+        b.append('\n');
+        if (engine != null) b.append(engine.diagnostics());
+        return b.toString();
+    }
 
     /** Converte a captura (tela cheia) para cinza com altura CAP_H. */
     static Mat toGray(ScreenshotResult r) {
