@@ -112,3 +112,28 @@ json.dump(cats, open(os.path.join(OUT, "categories.json"), "w"), ensure_ascii=Fa
 json.dump(pts, open(os.path.join(OUT, "points.json"), "w"), separators=(",", ":"))
 json.dump(meta, open(os.path.join(OUT, "meta.json"), "w"), indent=1)
 print("categorias", len(cats), "pontos", len(pl), "icones", len(icons))
+
+# ------------------------------------------------ assinatura visual do mapa
+# ORB no mapa em zoom -2 (1/4 do zoom 0). Mesmos parametros usados no app.
+import cv2, numpy as np, struct, zipfile
+g = cv2.imread(os.path.join(OUT, "map_z-2.jpg"), cv2.IMREAD_GRAYSCALE)
+orb = cv2.ORB_create(nfeatures=200000, scaleFactor=1.3, nlevels=3, fastThreshold=8)
+kp, des = orb.detectAndCompute(g, None)
+xy = np.float32([k.pt for k in kp])
+with open(os.path.join(OUT, "features.bin"), "wb") as f:
+    f.write(struct.pack("<ii", len(kp), 4))          # quantidade, fator p/ zoom 0
+    f.write(xy.astype("<f4").tobytes())
+    f.write(des.tobytes())
+print("features", len(kp))
+
+# --------------------------------------------- pacote unico para o app
+ver = meta["map_version"][:8] + "-" + str(len(pl))
+meta["pack_version"] = ver
+json.dump(meta, open(os.path.join(OUT, "meta.json"), "w"), indent=1)
+with zipfile.ZipFile(os.path.join(OUT, "pack.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+    for name in ("meta.json", "categories.json", "points.json", "features.bin"):
+        z.write(os.path.join(OUT, name), name)
+    for fn in os.listdir(os.path.join(OUT, "icons")):
+        z.write(os.path.join(OUT, "icons", fn), "icons/" + fn)
+open(os.path.join(OUT, "pack_version.txt"), "w").write(ver)
+print("pack", ver, os.path.getsize(os.path.join(OUT, "pack.zip")))
