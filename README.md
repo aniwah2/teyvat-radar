@@ -9,7 +9,7 @@ Mapa flutuante e transparente que fica **por cima do Genshin Impact** no Android
 
 ## Como funciona (v0.2.0)
 
-1. O app captura a tela algumas vezes por segundo, só para reconhecer o mapa. Nada é gravado nem enviado.
+1. Pelo serviço de Acessibilidade, o app olha a tela cerca de 3 vezes por segundo, só enquanto o Genshin está aberto, para reconhecer o mapa. Nada é gravado nem enviado.
 2. Quando o mapa do jogo abre, o botão ⚔ aparece no canto esquerdo.
 3. No botão você escolhe o que quer ver (inimigos, animais, plantas…) e toca em **Aplicar**.
 4. O app reconhece qual pedaço de Teyvat está na tela, lendo a barra de zoom e comparando com o mapa oficial, e desenha os ícones no lugar certo.
@@ -50,5 +50,6 @@ Segue [SemVer](https://semver.org/lang/pt-BR/). Cada versão tem uma tag `vX.Y.Z
 
 | Versão | Novidades |
 | ------ | --------- |
+| 0.3.0 | Radar via Acessibilidade (funciona junto com a gravação de tela), liga sozinho com o jogo, escala mais precisa |
 | 0.2.0 | Radar sobre o mapa do jogo: botão só com o mapa aberto, filtros com ícones, marcadores alinhados |
 | 0.1.0 | Primeira versão: mapa flutuante, transparência, modo fantasma |
