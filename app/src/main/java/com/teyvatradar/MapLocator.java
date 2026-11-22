@@ -171,13 +171,15 @@ public class MapLocator {
             if (train != refDes) train.release();
 
             // votacao da translacao (referencia - tela)
-            List<float[]> T = new ArrayList<>();
+            List<float[]> T = new ArrayList<>(), Q = new ArrayList<>(), R = new ArrayList<>();
             for (MatOfDMatch mm : knn) {
                 DMatch[] d = mm.toArray();
                 if (d.length < 2 || d[0].distance >= 0.85f * d[1].distance) continue;
                 int ri = sub != null ? sub[d[0].trainIdx] : d[0].trainIdx;
                 Point p = q[d[0].queryIdx].pt;
                 T.add(new float[]{refXY[2 * ri] - (float) p.x, refXY[2 * ri + 1] - (float) p.y});
+                Q.add(new float[]{(float) p.x, (float) p.y});
+                R.add(new float[]{refXY[2 * ri], refXY[2 * ri + 1]});
             }
             for (MatOfDMatch mm : knn) mm.release();
             if (T.size() < 5) return null;
@@ -203,13 +205,35 @@ public class MapLocator {
             int need = prior != null ? 5 : 6;
             if (best < need) return null;
             float bx = (int) (bestKey >> 32) * B, by = (int) (long) bestKey * B;
+            int nT = T.size();
+            boolean[] inl = new boolean[nT];
+            for (int i = 0; i < nT; i++) inl[i] = Math.hypot(T.get(i)[0] - bx, T.get(i)[1] - by) < 2 * B;
             List<Float> xs = new ArrayList<>(), ys = new ArrayList<>();
-            for (float[] t : T)
-                if (Math.hypot(t[0] - bx, t[1] - by) < 2 * B) { xs.add(t[0]); ys.add(t[1]); }
+            for (int i = 0; i < nT; i++) if (inl[i]) { xs.add(T.get(i)[0]); ys.add(T.get(i)[1]); }
+            double sc = 1, tx = median(xs), ty = median(ys);
+            // ajuste fino da escala (a barra de zoom tem alguns % de erro, que pesa nas bordas)
+            for (int it = 0; it < 3; it++) {
+                double qx = 0, qy = 0, rx = 0, ry = 0; int m = 0;
+                for (int i = 0; i < nT; i++) if (inl[i]) { qx += Q.get(i)[0]; qy += Q.get(i)[1]; rx += R.get(i)[0]; ry += R.get(i)[1]; m++; }
+                if (m < 8) break;
+                qx /= m; qy /= m; rx /= m; ry /= m;
+                double num = 0, den = 0;
+                for (int i = 0; i < nT; i++) if (inl[i]) {
+                    double dqx = Q.get(i)[0] - qx, dqy = Q.get(i)[1] - qy;
+                    num += dqx * (R.get(i)[0] - rx) + dqy * (R.get(i)[1] - ry);
+                    den += dqx * dqx + dqy * dqy;
+                }
+                if (den <= 0) break;
+                double s2 = num / den;
+                if (s2 < 0.75 || s2 > 1.33) break;
+                sc = s2; tx = rx - sc * qx; ty = ry - sc * qy;
+                for (int i = 0; i < nT; i++)
+                    inl[i] = Math.hypot(Q.get(i)[0] * sc + tx - R.get(i)[0], Q.get(i)[1] * sc + ty - R.get(i)[1]) < 8;
+            }
             Pose p = new Pose();
-            p.cx = (median(xs) + small.cols() / 2.0) * factor;
-            p.cy = (median(ys) + small.rows() / 2.0) * factor;
-            p.k = k;
+            p.cx = (small.cols() / 2.0 * sc + tx) * factor;
+            p.cy = (small.rows() / 2.0 * sc + ty) * factor;
+            p.k = k * sc;
             p.votes = best;
             p.global = prior == null;
             return p;

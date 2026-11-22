@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_desc">O Teyvat Radar olha a tela só enquanto o Genshin está aberto, para reconhecer o mapa do jogo e desenhar por cima dele os monstros, animais e materiais que você filtrar. Nada é gravado nem enviado para lugar nenhum.</string>
+    <string name="a11y_summary">Mostra monstros e materiais no mapa do Genshin</string>
+</resources>

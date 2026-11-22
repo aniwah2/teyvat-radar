@@ -32,6 +32,7 @@ public class MarkerView extends View {
     /** Posicoes desenhadas no ultimo quadro, em px da captura (para mascarar). */
     public volatile float[] drawnCap = new float[0];
     public volatile float drawnRadiusCap = 0;
+    public volatile int drawnCapH = 0;
 
     public MarkerView(Context c) {
         super(c);
@@ -86,5 +87,6 @@ public class MarkerView extends View {
         System.arraycopy(out, 0, d, 0, 2 * n);
         drawnCap = d;
         drawnRadiusCap = (r + 3) / sc;
+        drawnCapH = capH;
     }
 }
