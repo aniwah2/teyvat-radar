@@ -20,7 +20,7 @@ jobs:
       - name: Ler versão
         id: v
         run: |
-          V=$(grep -oP 'android:versionName="\K[^"]+' AndroidManifest.xml)
+          V=$(grep -oP 'versionName "\K[^"]+' app/build.gradle)
           echo "tag=v$V" >> "$GITHUB_OUTPUT"
 
       - name: Publicar
