@@ -50,7 +50,8 @@ Segue [SemVer](https://semver.org/lang/pt-BR/). Cada versão tem uma tag `vX.Y.Z
 
 | Versão | Novidades |
 | ------ | --------- |
-| 0.5.0 | Oculta o que já foi feito até renascer; minimapa discreto; ícones não ficam fora do jogo |
+| 0.5.1 | Remove a ocultação automática; mantém minimapa discreto e correção fora do jogo |
+| 0.5.0 | Oculta o que já foi feito até renascer (removido na 0.5.1); minimapa discreto; ícones não ficam fora do jogo |
 | 0.4.0 | Marcadores no minimapa, com rastreamento da posição; dados atualizados sozinhos |
 | 0.3.1 | Radar não desliga com o gravador/Game Turbo; aviso de ativo; diagnóstico |
 | 0.3.0 | Radar via Acessibilidade (funciona junto com a gravação de tela), liga sozinho com o jogo, escala mais precisa |
