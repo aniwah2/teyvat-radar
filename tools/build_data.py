@@ -127,11 +127,11 @@ with open(os.path.join(OUT, "features.bin"), "wb") as f:
 print("features", len(kp))
 
 # --------------------------------------------- pacote unico para o app
-ver = meta["map_version"][:8] + "-" + str(len(pl))
+ver = meta["map_version"][:8] + "-" + str(len(pl)) + "-m2"   # m2: inclui mapas p/ o minimapa
 meta["pack_version"] = ver
 json.dump(meta, open(os.path.join(OUT, "meta.json"), "w"), indent=1)
 with zipfile.ZipFile(os.path.join(OUT, "pack.zip"), "w", zipfile.ZIP_DEFLATED) as z:
-    for name in ("meta.json", "categories.json", "points.json", "features.bin"):
+    for name in ("meta.json", "categories.json", "points.json", "features.bin", "map_z-2.jpg", "map_z-3.jpg"):
         z.write(os.path.join(OUT, name), name)
     for fn in os.listdir(os.path.join(OUT, "icons")):
         z.write(os.path.join(OUT, "icons", fn), "icons/" + fn)
