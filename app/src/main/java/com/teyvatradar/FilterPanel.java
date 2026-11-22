@@ -30,7 +30,6 @@ public class FilterPanel extends LinearLayout {
     public interface Listener {
         void onApply(Set<Integer> selected);
         void onClose();
-        void onRestoreHidden();
     }
 
     static final int GOLD = 0xFFD4AF37, GOLD_L = 0xFFFFE6A8, BG = 0xF212141F, BAR = 0xFF1E2235,
@@ -52,11 +51,8 @@ public class FilterPanel extends LinearLayout {
     TextView countText;
     EditText search;
 
-    final HiddenStore hidden;
-
-    public FilterPanel(Context c, DataStore d, Set<Integer> selected, int panelWidthPx, HiddenStore h, Listener l) {
+    public FilterPanel(Context c, DataStore d, Set<Integer> selected, int panelWidthPx, Listener l) {
         super(c);
-        hidden = h;
         data = d;
         listener = l;
         sel = new HashSet<>(selected);
@@ -187,16 +183,6 @@ public class FilterPanel extends LinearLayout {
             }
         });
         f.addView(clear, new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(40)));
-        final int nh = hidden != null ? hidden.count() : 0;
-        if (nh > 0) {
-            final TextView restore = button("Mostrar " + nh + " já feito(s)", false);
-            restore.setOnClickListener(new OnClickListener() {
-                public void onClick(View v) { listener.onRestoreHidden(); restore.setVisibility(GONE); }
-            });
-            LayoutParams rl = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, px(40));
-            rl.leftMargin = px(8);
-            f.addView(restore, rl);
-        }
         countText = new TextView(getContext());
         countText.setTextColor(MUTED);
         countText.setTextSize(13);
