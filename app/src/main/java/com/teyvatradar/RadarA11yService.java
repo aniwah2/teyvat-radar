@@ -93,6 +93,7 @@ public class RadarA11yService extends AccessibilityService {
         boolean genshin = false;
         for (String g : GENSHIN) if (g.equals(pkg)) genshin = true;
         if (genshin) {
+            if (engine != null) engine.gameForeground = true;
             if (!gameOnTop) {
                 gameOnTop = true;
                 failures = 0;
@@ -102,6 +103,7 @@ public class RadarA11yService extends AccessibilityService {
         } else if (!pkg.equals(getPackageName()) && isRealAppScreen(pkg, cls)) {
             // outro app abriu uma TELA de verdade. Janelas flutuantes (gravador, Game Turbo,
             // bolhas, teclado, notificacoes) nao contam.
+            if (engine != null) engine.gameForeground = false;
             if (gameOnTop) { gameOnTop = false; if (engine != null) engine.hideAll(); }
         }
     }
@@ -164,7 +166,7 @@ public class RadarA11yService extends AccessibilityService {
                         shooting = false;
                         // rapido com o jogo na frente; devagar fora dele (rede de seguranca:
                         // se o mapa aparecer sem o aviso do Android, o radar acorda sozinho)
-                        if (!gameOnTop && engine.mapOpen) gameOnTop = true;
+                        if (!gameOnTop && engine.mapOpen) { gameOnTop = true; engine.gameForeground = true; }
                         long iv = gameOnTop ? INTERVAL_MS : IDLE_MS;
                         schedule(Math.max(0, iv - (SystemClock.uptimeMillis() - t0)));
                     }

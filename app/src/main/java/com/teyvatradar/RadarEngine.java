@@ -66,6 +66,12 @@ public class RadarEngine {
     WindowManager.LayoutParams miniLp;
     boolean miniShown;
     MiniTracker mini;
+    HiddenStore hidden;
+    final java.util.Map<String, Double> dwell = new java.util.HashMap<>();
+    long lastMiniOk;
+    int miniOkStreak;
+    /** Falso quando outro app esta na frente: nunca desenha o minimapa. */
+    public volatile boolean gameForeground = true;
     volatile boolean justOpened;
     volatile String lastMini = "-";
     FilterPanel panel;
@@ -97,7 +103,10 @@ public class RadarEngine {
         }
         ui = new ContextThemeWrapper(wc, android.R.style.Theme_DeviceDefault);
         wm = wc.getSystemService(WindowManager.class);
+        hidden = new HiddenStore(service.getFilesDir());
         setupViews();
+        markers.hidden = hidden;
+        miniView.hidden = hidden;
         loading = true;
         worker.post(new Runnable() { public void run() { loadData(); } });
     }
@@ -151,7 +160,11 @@ public class RadarEngine {
         frames++;
         lastW = g.cols(); lastH = g.rows();
         if (!ready || panelOpen || destroyed) return;
-        if (g.cols() < g.rows()) { setMapOpen(false); return; }   // retrato: o jogo nao esta na tela
+        if (g.cols() < g.rows()) {                 // retrato: o jogo nao esta na tela
+            setMapOpen(false);
+            if (miniShown || miniOkStreak > 0) { miniOkStreak = 0; hideMini(); }
+            return;
+        }
         double score = locator.mapOpenScore(g);
         lastScore = score;
         boolean open = score > 0.75;
@@ -209,7 +222,7 @@ public class RadarEngine {
                 + String.format(java.util.Locale.ROOT, "Mapa aberto: %s (semelhança %.2f)%n", mapOpen ? "sim" : "não", lastScore)
                 + String.format(java.util.Locale.ROOT, "Escala: %.2f | Localização: %s%n", lastK, lastLocate)
                 + "Minimapa: " + lastMini + "\n"
-                + "Itens filtrados: " + selected.size();
+                + "Itens filtrados: " + selected.size() + " | ocultos (já feitos): " + (hidden != null ? hidden.count() : 0);
     }
 
     /** Aviso curto "Teyvat Radar ativo" ao entrar no jogo. */
@@ -228,24 +241,67 @@ public class RadarEngine {
     }
 
     void processMini(Mat g) {
-        if (mini == null || selected.isEmpty() || !prefs.getBoolean("minimap", true)) {
+        if (mini == null || selected.isEmpty() || !prefs.getBoolean("minimap", true) || !gameForeground) {
+            miniOkStreak = 0;
             if (miniShown) hideMini();
             return;
         }
         float[] er = miniView.drawnCapH == g.rows() ? miniView.drawnCap : null;
         boolean ok = mini.update(g, er, miniView.drawnRadiusCap);
         lastMini = String.format(java.util.Locale.ROOT, "%s (semelhança %.2f)", ok ? "rastreando" : "procurando", mini.lastCorr);
-        if (ok) {
+        miniOkStreak = ok ? miniOkStreak + 1 : 0;
+        if (ok && miniOkStreak >= 2) {            // duas confirmacoes seguidas antes de desenhar
+            autoHide(mini.px, mini.py);
             final double px = mini.px, py = mini.py;
             final int ch = g.rows();
             main.post(new Runnable() { public void run() {
-                if (mapOpen || panelOpen) return;
+                if (mapOpen || panelOpen || !gameForeground || miniOkStreak < 2) return;
                 miniView.setMini(mini.cx, mini.cy, mini.r, mini.k, px, py, ch);
                 if (!miniShown) { addSafe(miniView, miniLp); miniShown = true; }
             } });
-        } else if (mini.misses >= 2 && miniShown) {
-            hideMini();
+        } else if (!ok && miniShown && mini.misses >= 2) {
+            hideMini();                           // minimapa sumiu (menu, dialogo, outro app)
         }
+    }
+
+    /**
+     * Se o personagem fica alguns segundos colado num ponto filtrado (lutando, coletando),
+     * o ponto conta como feito e some ate renascer.
+     */
+    void autoHide(double px, double py) {
+        long now = System.currentTimeMillis();
+        double dt = lastMiniOk == 0 ? 0 : Math.min(1.0, (now - lastMiniOk) / 1000.0);
+        lastMiniOk = now;
+        if (!prefs.getBoolean("autohide", true) || data == null) return;
+        final double R = 28;                     // px do mapa (zoom 0) ~ alguns metros
+        java.util.Set<String> near = new java.util.HashSet<>();
+        for (MarkerView.Layer L : miniView.layers) {
+            DataStore.Cat c = data.byId.get(L.id);
+            if (c == null || !HiddenStore.autoHideable(c)) continue;
+            for (int i = 0; i < L.xy.length; i += 2) {
+                if (Math.abs(L.xy[i] - px) > R || Math.abs(L.xy[i + 1] - py) > R) continue;
+                if (Math.hypot(L.xy[i] - px, L.xy[i + 1] - py) > R) continue;
+                String k = L.keys[i / 2];
+                if (hidden.isHidden(k)) continue;
+                near.add(k);
+                Double d = dwell.get(k);
+                double v = (d == null ? 0 : d) + dt;
+                dwell.put(k, v);
+                if (v >= HiddenStore.dwellSeconds(c)) {
+                    final long ms = HiddenStore.respawnMs(c);
+                    hidden.hide(k, ms);
+                    dwell.remove(k);
+                    final String name = c.name;
+                    main.post(new Runnable() { public void run() {
+                        toast("\u2714 " + name + " marcado como feito"
+                                + (ms == Long.MAX_VALUE ? "" : " (volta em " + (ms / HiddenStore.H) + " h)"));
+                        miniView.invalidate();
+                        markers.invalidate();
+                    } });
+                }
+            }
+        }
+        dwell.keySet().retainAll(near);
     }
 
     void hideMini() {
@@ -285,6 +341,7 @@ public class RadarEngine {
     /** O jogo saiu da tela (outro app em primeiro plano): esconde tudo. */
     public void hideAll() {
         openStreak = closedStreak = 0;
+        miniOkStreak = 0;
         mapOpen = false;
         pose = null;
         main.post(new Runnable() { public void run() {
@@ -415,7 +472,7 @@ public class RadarEngine {
         if (panelOpen || data == null) return;
         Rect b = wm.getMaximumWindowMetrics().getBounds();
         int w = (int) (b.width() * 0.74f), h = (int) (b.height() * 0.88f);
-        panel = new FilterPanel(ui, data, selected, w, new FilterPanel.Listener() {
+        panel = new FilterPanel(ui, data, selected, w, hidden, new FilterPanel.Listener() {
             public void onApply(Set<Integer> s) {
                 selected = s;
                 HashSet<String> ss = new HashSet<>();
@@ -426,6 +483,12 @@ public class RadarEngine {
                 toast(s.isEmpty() ? "Filtros removidos" : "Mostrando " + s.size() + " item(ns) no mapa");
             }
             public void onClose() { closePanel(); }
+            public void onRestoreHidden() {
+                hidden.clear();
+                markers.invalidate();
+                miniView.invalidate();
+                toast("Todos os itens ocultos voltaram a aparecer");
+            }
         });
         panelLp = params(w, h, WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL);
         panelLp.gravity = Gravity.CENTER;
@@ -455,6 +518,8 @@ public class RadarEngine {
             L.id = id;
             L.xy = xy;
             L.icon = data.icon(id);
+            L.keys = new String[xy.length / 2];
+            for (int i = 0; i < xy.length; i += 2) L.keys[i / 2] = HiddenStore.key(id, xy[i], xy[i + 1]);
             ls.add(L);
         }
         markers.setLayers(ls);

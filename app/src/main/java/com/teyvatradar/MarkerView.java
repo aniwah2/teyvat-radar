@@ -18,6 +18,7 @@ public class MarkerView extends View {
     public static class Layer {
         int id;
         float[] xy;     // pontos no zoom 0
+        String[] keys;  // chaves para a lista de ocultos
         Bitmap icon;
     }
 
@@ -26,6 +27,7 @@ public class MarkerView extends View {
     final Paint img = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.ANTI_ALIAS_FLAG);
     final float r;
     List<Layer> layers = new ArrayList<>();
+    HiddenStore hidden;
     MapLocator.Pose pose;
     int capW, capH;
 
@@ -43,11 +45,16 @@ public class MarkerView extends View {
     public MarkerView(Context c, boolean miniMode) {
         super(c);
         mini = miniMode;
-        r = (miniMode ? 8 : 15) * getResources().getDisplayMetrics().density;
+        r = (miniMode ? 5.5f : 15) * getResources().getDisplayMetrics().density;
         bg.setColor(0xEE12141F);
         ring.setStyle(Paint.Style.STROKE);
-        ring.setStrokeWidth((miniMode ? 1.4f : 2.2f) * getResources().getDisplayMetrics().density);
+        ring.setStrokeWidth((miniMode ? 1.0f : 2.2f) * getResources().getDisplayMetrics().density);
         ring.setColor(0xFFD4AF37);
+        if (miniMode) {                 // minimapa: menor e translucido, para o mapa continuar visivel
+            bg.setColor(0x7012141F);
+            ring.setColor(0xB0D4AF37);
+            img.setAlpha(170);
+        }
     }
 
     public void setLayers(List<Layer> l) {
@@ -80,6 +87,7 @@ public class MarkerView extends View {
         outer:
         for (Layer L : layers) {
             for (int i = 0; i < L.xy.length; i += 2) {
+                if (hidden != null && L.keys != null && hidden.isHidden(L.keys[i / 2])) continue;
                 float x = (float) ((L.xy[i] - mPx) / perScreenPx + ccx);
                 float y = (float) ((L.xy[i + 1] - mPy) / perScreenPx + ccy);
                 if (Math.hypot(x - ccx, y - ccy) > rad) continue;
@@ -116,6 +124,7 @@ public class MarkerView extends View {
         outer:
         for (Layer L : layers) {
             for (int i = 0; i < L.xy.length; i += 2) {
+                if (hidden != null && L.keys != null && hidden.isHidden(L.keys[i / 2])) continue;
                 float x = (float) ((L.xy[i] - p.cx) / perScreenPx + W / 2);
                 float y = (float) ((L.xy[i + 1] - p.cy) / perScreenPx + H / 2);
                 if (x < -r || y < -r || x > W + r || y > H + r) continue;

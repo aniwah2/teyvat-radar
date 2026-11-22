@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     Button dataBtn, a11yBtn, toggleBtn, overlayBtn, notifBtn;
     boolean downloading;
     TextView diag;
-    Button miniBtn;
+    Button miniBtn, autoBtn;
 
     int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -93,10 +93,17 @@ public class MainActivity extends Activity {
                 refresh();
             }
         });
+        autoBtn = button(col, "", new View.OnClickListener() {
+            public void onClick(View v) {
+                prefs.edit().putBoolean("autohide", !prefs.getBoolean("autohide", true)).apply();
+                refresh();
+            }
+        });
         col.addView(text(
                 "Com a acessibilidade ativada, o radar liga sozinho quando o Genshin abre. Abra o mapa do jogo: " +
                 "o botão ⚔ aparece no canto esquerdo. Toque nele, marque o que quer ver e toque em Aplicar.\n\n" +
                 "Pode gravar a tela normalmente: este modo não usa o recurso de gravação.\n\n" +
+                "Ocultar o que já fiz: quando você fica alguns segundos em cima de um ponto (lutando ou coletando), ele some até renascer: animais e inimigos 12 h, especialidades 48 h, ferro 24 h, cristal 72 h; baús não voltam. Para trazer de volta, use \u201CMostrar já feitos\u201D no painel de filtros.\n\n" +
                 "Para tirar as marcações: abra o mapa, toque no botão e use “Limpar filtros”.", 14, TEXT));
 
         col.addView(label("Diagnóstico"));
@@ -147,6 +154,7 @@ public class MainActivity extends Activity {
         if (!downloading) dataStatus.setText(data.isReady() ? "Dados prontos (versão " + data.localVersion() + ")" : "Dados ainda não baixados");
         a11yBtn.setText((a11y ? "✔ " : "") + "2. Ativar o Teyvat Radar na Acessibilidade");
         miniBtn.setText(prefs.getBoolean("minimap", true) ? "Minimapa: mostrando \u2014 toque para esconder" : "Minimapa: escondido \u2014 toque para mostrar");
+        autoBtn.setText(prefs.getBoolean("autohide", true) ? "Ocultar o que já fiz: ligado \u2014 toque para desligar" : "Ocultar o que já fiz: desligado \u2014 toque para ligar");
         toggleBtn.setText(on ? "Radar ligado — toque para desligar" : "Radar desligado — toque para ligar");
         boolean ov = Settings.canDrawOverlays(this);
         boolean nt = Build.VERSION.SDK_INT < 33 ||
