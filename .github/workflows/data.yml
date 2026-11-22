@@ -1,0 +1,32 @@
+name: Dados do mapa
+
+# Baixa dados do mapa oficial (HoYoLAB) e publica no branch "data".
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [tools/**]
+
+permissions:
+  contents: write
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pillow numpy
+      - name: Coletar
+        run: |
+          python tools/explore.py data_out
+          if [ -f tools/build_data.py ]; then python tools/build_data.py data_out; fi
+      - name: Publicar no branch data
+        run: |
+          cd data_out
+          git init -q -b data
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -qm "Dados do mapa $(date -u +%F)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" data
