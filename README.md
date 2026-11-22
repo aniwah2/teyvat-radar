@@ -7,7 +7,16 @@ Mapa flutuante e transparente que fica **por cima do Genshin Impact** no Android
 - **Última versão:** [TeyvatRadar.apk](https://github.com/aniwah2/teyvat-radar/releases/latest/download/TeyvatRadar.apk)
 - **Todas as versões:** [Releases](https://github.com/aniwah2/teyvat-radar/releases)
 
-## Recursos (v0.1.0)
+## Como funciona (v0.2.0)
+
+1. O app captura a tela algumas vezes por segundo, só para reconhecer o mapa. Nada é gravado nem enviado.
+2. Quando o mapa do jogo abre, o botão ⚔ aparece no canto esquerdo.
+3. No botão você escolhe o que quer ver (inimigos, animais, plantas…) e toca em **Aplicar**.
+4. O app reconhece qual pedaço de Teyvat está na tela, lendo a barra de zoom e comparando com o mapa oficial, e desenha os ícones no lugar certo.
+
+Os dados (pontos, ícones e a "impressão digital" do mapa) são gerados pelo workflow **Dados do mapa** a partir do mapa interativo oficial da HoYoLAB e publicados no branch `data`.
+
+## Recursos da v0.1.0 (janela flutuante, substituída na v0.2.0)
 
 - Bolinha flutuante ⚔ que abre e fecha o mapa
 - Mapa interativo oficial do HoYoLAB, com filtros de inimigos que ficam salvos
@@ -27,12 +36,10 @@ Mapa flutuante e transparente que fica **por cima do Genshin Impact** no Android
 
 ## Compilar
 
-O app é escrito em Java puro, sem Gradle nem Android Studio, e compila no Ubuntu:
+Projeto Gradle (Java + OpenCV 4.10). O workflow **Compilar app** gera o APK sem assinatura no branch `build`; ele é assinado com a chave do projeto e colocado em `dist/`, o que dispara a Release.
 
 ```bash
-sudo apt install openjdk-21-jdk-headless aapt apksigner zipalign dalvik-exchange
-# android.jar (API 34 para os recursos e 35 para compilar) em ../sdk/
-./build.sh
+gradle :app:assembleRelease
 ```
 
 A chave de assinatura (`radar.keystore`) **não fica no repositório**. Mantenha uma cópia sua: sem ela, as próximas versões não instalam por cima da anterior.
@@ -43,4 +50,5 @@ Segue [SemVer](https://semver.org/lang/pt-BR/). Cada versão tem uma tag `vX.Y.Z
 
 | Versão | Novidades |
 | ------ | --------- |
+| 0.2.0 | Radar sobre o mapa do jogo: botão só com o mapa aberto, filtros com ícones, marcadores alinhados |
 | 0.1.0 | Primeira versão: mapa flutuante, transparência, modo fantasma |
