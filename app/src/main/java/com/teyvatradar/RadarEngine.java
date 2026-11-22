@@ -62,7 +62,12 @@ public class RadarEngine {
 
     TextView button, pill;
     WindowManager.LayoutParams btnLp, pillLp, mkLp, panelLp;
-    MarkerView markers;
+    MarkerView markers, miniView;
+    WindowManager.LayoutParams miniLp;
+    boolean miniShown;
+    MiniTracker mini;
+    volatile boolean justOpened;
+    volatile String lastMini = "-";
     FilterPanel panel;
     boolean buttonShown, markersShown, pillShown;
     public volatile boolean panelOpen;
@@ -101,7 +106,7 @@ public class RadarEngine {
         destroyed = true;
         worker.removeCallbacksAndMessages(null);
         main.removeCallbacksAndMessages(null);
-        removeSafe(button); removeSafe(markers); removeSafe(panel); removeSafe(pill);
+        removeSafe(button); removeSafe(markers); removeSafe(panel); removeSafe(pill); removeSafe(miniView);
         workerThread.quitSafely();
     }
 
@@ -114,6 +119,10 @@ public class RadarEngine {
             if (!d.isReady()) throw new IllegalStateException("sem dados");
             d.load();
             locator = new MapLocator(svc, d);
+            if (mini != null) mini.release();
+            mini = null;
+            try { mini = new MiniTracker(locator.spec, d.dir); }
+            catch (Throwable e) { Log.e(TAG, "minimapa", e); lastMini = "sem mapas de referência (atualize os dados)"; }
             data = d;
             ready = true;
             main.post(new Runnable() { public void run() { rebuildLayers(); } });
@@ -149,6 +158,8 @@ public class RadarEngine {
         if (open) { openStreak++; closedStreak = 0; } else { closedStreak++; openStreak = 0; }
         if (!mapOpen && openStreak >= 2) setMapOpen(true);
         if (mapOpen && closedStreak >= 2) setMapOpen(false);
+        if (!open && !mapOpen) { processMini(g); return; }
+        if (miniShown) hideMini();
         if (!mapOpen || !open || selected.isEmpty()) return;
 
         double k = locator.scaleFromKnob(g);
@@ -172,6 +183,10 @@ public class RadarEngine {
         mask.release();
         if (p == null) { miss(); lastLocate = "posição não encontrada"; return; }
         lastLocate = "ok (" + p.votes + " votos)";
+        if (justOpened) {                  // o mapa abre centralizado no personagem
+            justOpened = false;
+            if (mini != null) mini.hint(p.cx, p.cy);
+        }
         missStreak = 0;
         pose = p;
         final MapLocator.Pose fp = p;
@@ -193,6 +208,7 @@ public class RadarEngine {
                 + "Quadros analisados: " + frames + " (" + lastW + "x" + lastH + ")\n"
                 + String.format(java.util.Locale.ROOT, "Mapa aberto: %s (semelhança %.2f)%n", mapOpen ? "sim" : "não", lastScore)
                 + String.format(java.util.Locale.ROOT, "Escala: %.2f | Localização: %s%n", lastK, lastLocate)
+                + "Minimapa: " + lastMini + "\n"
                 + "Itens filtrados: " + selected.size();
     }
 
@@ -208,6 +224,35 @@ public class RadarEngine {
             main.postDelayed(new Runnable() { public void run() {
                 if (!pillShown) removeSafe(pill);
             } }, 3500);
+        } });
+    }
+
+    void processMini(Mat g) {
+        if (mini == null || selected.isEmpty() || !prefs.getBoolean("minimap", true)) {
+            if (miniShown) hideMini();
+            return;
+        }
+        float[] er = miniView.drawnCapH == g.rows() ? miniView.drawnCap : null;
+        boolean ok = mini.update(g, er, miniView.drawnRadiusCap);
+        lastMini = String.format(java.util.Locale.ROOT, "%s (semelhança %.2f)", ok ? "rastreando" : "procurando", mini.lastCorr);
+        if (ok) {
+            final double px = mini.px, py = mini.py;
+            final int ch = g.rows();
+            main.post(new Runnable() { public void run() {
+                if (mapOpen || panelOpen) return;
+                miniView.setMini(mini.cx, mini.cy, mini.r, mini.k, px, py, ch);
+                if (!miniShown) { addSafe(miniView, miniLp); miniShown = true; }
+            } });
+        } else if (mini.misses >= 2 && miniShown) {
+            hideMini();
+        }
+    }
+
+    void hideMini() {
+        main.post(new Runnable() { public void run() {
+            removeSafe(miniView);
+            miniView.drawnCap = new float[0];
+            miniShown = false;
         } });
     }
 
@@ -229,6 +274,7 @@ public class RadarEngine {
     void setMapOpen(final boolean open) {
         if (mapOpen == open) return;
         mapOpen = open;
+        if (open) justOpened = true;
         if (!open) pose = null;
         main.post(new Runnable() { public void run() {
             showButton(open);
@@ -245,6 +291,9 @@ public class RadarEngine {
             if (panelOpen) closePanel();
             showButton(false);
             showMarkers(false);
+            removeSafe(miniView);
+            miniView.drawnCap = new float[0];
+            miniShown = false;
         } });
     }
 
@@ -286,6 +335,10 @@ public class RadarEngine {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
         // fora da acessibilidade, o Android so deixa o toque passar se a janela tiver <= 80% de opacidade
         mkLp.alpha = trusted ? 1f : 0.8f;
+        miniView = new MarkerView(ui, true);
+        miniLp = params(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+        miniLp.alpha = trusted ? 1f : 0.8f;
 
         pill = new TextView(ui);
         pill.setText("⏸  Radar pausado · toque para religar");
@@ -405,6 +458,7 @@ public class RadarEngine {
             ls.add(L);
         }
         markers.setLayers(ls);
+        miniView.setLayers(ls);
         refreshButton();
     }
 

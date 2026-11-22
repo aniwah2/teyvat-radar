@@ -34,12 +34,19 @@ public class MarkerView extends View {
     public volatile float drawnRadiusCap = 0;
     public volatile int drawnCapH = 0;
 
-    public MarkerView(Context c) {
+    // modo minimapa
+    boolean mini;
+    double mCx, mCy, mR, mK, mPx = Double.NaN, mPy;
+
+    public MarkerView(Context c) { this(c, false); }
+
+    public MarkerView(Context c, boolean miniMode) {
         super(c);
-        r = 15 * getResources().getDisplayMetrics().density;
+        mini = miniMode;
+        r = (miniMode ? 8 : 15) * getResources().getDisplayMetrics().density;
         bg.setColor(0xEE12141F);
         ring.setStyle(Paint.Style.STROKE);
-        ring.setStrokeWidth(2.2f * getResources().getDisplayMetrics().density);
+        ring.setStrokeWidth((miniMode ? 1.4f : 2.2f) * getResources().getDisplayMetrics().density);
         ring.setColor(0xFFD4AF37);
     }
 
@@ -55,8 +62,49 @@ public class MarkerView extends View {
         invalidate();
     }
 
+    /** Minimapa: geometria (fracoes da altura), escala e posicao do personagem. */
+    public void setMini(double cx, double cy, double rr, double k, double px, double py, int capH) {
+        mCx = cx; mCy = cy; mR = rr; mK = k; mPx = px; mPy = py; this.capH = capH;
+        invalidate();
+    }
+
+    void drawMini(Canvas c) {
+        if (Double.isNaN(mPx) || layers.isEmpty() || capH == 0) { drawnCap = new float[0]; return; }
+        float H = getHeight();
+        float sc = H / capH;
+        float ccx = (float) (mCx * H), ccy = (float) (mCy * H), rad = (float) (mR * H * 0.93) - r * 0.6f;
+        double perScreenPx = mK * MapLocator.CAP_H / H;
+        float[] out = new float[MAX_DRAWN * 2];
+        int n = 0;
+        RectF dst = new RectF();
+        outer:
+        for (Layer L : layers) {
+            for (int i = 0; i < L.xy.length; i += 2) {
+                float x = (float) ((L.xy[i] - mPx) / perScreenPx + ccx);
+                float y = (float) ((L.xy[i + 1] - mPy) / perScreenPx + ccy);
+                if (Math.hypot(x - ccx, y - ccy) > rad) continue;
+                c.drawCircle(x, y, r, bg);
+                if (L.icon != null) {
+                    float ir = r * 0.82f;
+                    dst.set(x - ir, y - ir, x + ir, y + ir);
+                    c.drawBitmap(L.icon, null, dst, img);
+                }
+                c.drawCircle(x, y, r, ring);
+                out[2 * n] = x / sc;
+                out[2 * n + 1] = y / sc;
+                if (++n >= MAX_DRAWN) break outer;
+            }
+        }
+        float[] d = new float[2 * n];
+        System.arraycopy(out, 0, d, 0, 2 * n);
+        drawnCap = d;
+        drawnRadiusCap = (r + 2) / sc;
+        drawnCapH = capH;
+    }
+
     @Override
     protected void onDraw(Canvas c) {
+        if (mini) { drawMini(c); return; }
         MapLocator.Pose p = pose;
         if (p == null || layers.isEmpty() || capH == 0) { drawnCap = new float[0]; return; }
         float W = getWidth(), H = getHeight();

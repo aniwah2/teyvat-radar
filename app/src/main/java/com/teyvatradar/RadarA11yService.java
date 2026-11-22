@@ -51,6 +51,27 @@ public class RadarA11yService extends AccessibilityService {
         engine = new RadarEngine(this, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, null);
         exec = new Executor() { public void execute(Runnable r) { engine.worker.post(r); } };
         schedule(800);
+        autoUpdateData();
+    }
+
+    /** Atualiza os dados do mapa sozinho (no maximo a cada 6 h), sem precisar abrir o app. */
+    void autoUpdateData() {
+        long last = prefs.getLong("lastDataCheck", 0);
+        final DataStore d = new DataStore(this);
+        boolean needsMaps = !new java.io.File(d.dir, "map_z-3.jpg").exists();
+        if (!needsMaps && System.currentTimeMillis() - last < 6 * 3600_000L) return;
+        new Thread(new Runnable() { public void run() {
+            try {
+                String remote = DataStore.remoteVersion();
+                prefs.edit().putLong("lastDataCheck", System.currentTimeMillis()).apply();
+                if (!remote.equals(d.localVersion()) || !d.isReady()) {
+                    d.download(null);
+                    if (engine != null) engine.reload();
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "autoUpdate", e);
+            }
+        } }).start();
     }
 
     public static boolean enabledByUser(SharedPreferences p) { return p.getBoolean("enabled", true); }

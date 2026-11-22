@@ -31,6 +31,7 @@ public class MainActivity extends Activity {
     Button dataBtn, a11yBtn, toggleBtn, overlayBtn, notifBtn;
     boolean downloading;
     TextView diag;
+    Button miniBtn;
 
     int dp(float v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
@@ -83,6 +84,12 @@ public class MainActivity extends Activity {
                 prefs.edit().putBoolean("enabled", !RadarA11yService.enabledByUser(prefs)).apply();
                 RadarA11yService s = RadarA11yService.instance;
                 if (s != null) s.onSettingsChanged(false);
+                refresh();
+            }
+        });
+        miniBtn = button(col, "", new View.OnClickListener() {
+            public void onClick(View v) {
+                prefs.edit().putBoolean("minimap", !prefs.getBoolean("minimap", true)).apply();
                 refresh();
             }
         });
@@ -139,6 +146,7 @@ public class MainActivity extends Activity {
         dataBtn.setText((data.isReady() ? "✔ " : "") + "1. Baixar dados do mapa");
         if (!downloading) dataStatus.setText(data.isReady() ? "Dados prontos (versão " + data.localVersion() + ")" : "Dados ainda não baixados");
         a11yBtn.setText((a11y ? "✔ " : "") + "2. Ativar o Teyvat Radar na Acessibilidade");
+        miniBtn.setText(prefs.getBoolean("minimap", true) ? "Minimapa: mostrando \u2014 toque para esconder" : "Minimapa: escondido \u2014 toque para mostrar");
         toggleBtn.setText(on ? "Radar ligado — toque para desligar" : "Radar desligado — toque para ligar");
         boolean ov = Settings.canDrawOverlays(this);
         boolean nt = Build.VERSION.SDK_INT < 33 ||
