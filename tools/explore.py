@@ -53,6 +53,15 @@ if html:
                 hits.append(f"[{i}:{kw}] " + t[max(0, m.start()-200):m.end()+300].replace("\n", " "))
                 if sum(1 for h in hits if h.startswith(f"[{i}:{kw}]")) > 6:
                     break
+# chunks carregados sob demanda (onde o tileBase e usado)
+b0 = open(os.path.join(OUT, "bundle_0.js"), encoding="utf-8").read() if os.path.exists(os.path.join(OUT, "bundle_0.js")) else ""
+m = re.search(r'"_"\+(\{[^}]*\})\[e\]\+"\.js"', b0)
+if m:
+    for cid, h in re.findall(r'(\d+):"([0-9a-f]+)"', m.group(1)):
+        t = try_get(f"chunk_{cid}.js", f"https://act.hoyolab.com/ys/app/interactive-map/{cid}_{h}.js")
+        if t:
+            for mm in re.finditer(r"tileBase", t):
+                hits.append(f"[chunk{cid}:tileBase] " + t[max(0, mm.start()-400):mm.end()+600])
 save("js_hits.txt", "\n\n".join(hits))
 save("log.txt", "\n".join(log))
 print("\n".join(log))
