@@ -1,0 +1,38 @@
+name: Publicar release
+
+# Quando um APK novo chega em dist/, cria a tag vX.Y.Z (lida do AndroidManifest)
+# e publica a Release com o APK anexado.
+on:
+  push:
+    branches: [main]
+    paths: [dist/TeyvatRadar.apk]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ler versão
+        id: v
+        run: |
+          V=$(grep -oP 'android:versionName="\K[^"]+' AndroidManifest.xml)
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG já existe; nada a fazer."; exit 0
+          fi
+          cp dist/TeyvatRadar.apk "TeyvatRadar-$TAG.apk"
+          NOTES=release-notes/$TAG.md
+          [ -f "$NOTES" ] || { echo "Versão $TAG" > "$NOTES"; }
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" \
+            --notes-file "$NOTES" dist/TeyvatRadar.apk "TeyvatRadar-$TAG.apk"

@@ -3,3 +3,4 @@ out/
 *.keystore
 *.jks
 *.idsig
+!dist/TeyvatRadar.apk
