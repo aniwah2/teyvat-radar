@@ -1,0 +1,5 @@
+dados: Dados atualizados (versão bd70cde1-90246-m2)
+mapa Liyue: OK (22474, 19150)
+jogo normal sem mapa: OK
+janelas: OK
+RESULTADO: OK

@@ -1,0 +1,4 @@
+total 98264
+drwxr-xr-x 1 runneradmin 197121         0 Nov 23 03:06 .
+drwxr-xr-x 1 runneradmin 197121         0 Nov 23 03:05 ..
+-rwxr-xr-x 1 runneradmin 197121 100614527 Nov 23 03:06 TeyvatRadar.exe
