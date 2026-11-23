@@ -1,0 +1,70 @@
+name: Desktop (Windows)
+
+# Compila o Teyvat Radar para Windows (.exe), roda o autoteste no Windows
+# e publica a Release desktop-vX.Y.Z (sem mexer no "latest" do APK).
+on:
+  push:
+    branches: [main]
+    paths: [desktop/**, .github/workflows/desktop.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Dependências
+        run: pip install -r desktop/requirements.txt pyinstaller
+      - name: Compilar .exe
+        working-directory: desktop
+        run: >
+          pyinstaller --noconfirm --onefile --windowed --name TeyvatRadar --icon icon.ico
+          --add-data "teyvat_radar/assets;teyvat_radar/assets" run.py
+      - name: Autoteste no Windows
+        id: test
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $p = Start-Process -FilePath "dist\TeyvatRadar.exe" -ArgumentList "--selftest", "$PWD\tests" -Wait -PassThru
+          Get-Content tests\selftest.txt
+          "code=$($p.ExitCode)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          if ($p.ExitCode -ne 0) { exit 1 }
+      - name: Registro no branch build-desktop
+        if: always()
+        shell: bash
+        run: |
+          mkdir out
+          cp desktop/tests/selftest.txt out/ 2>/dev/null || echo "sem selftest" > out/selftest.txt
+          ls -la desktop/dist > out/dist.txt 2>&1 || true
+          echo "${{ steps.test.outcome }} ${{ github.sha }}" > out/status.txt
+          cd out && git init -q -b build-desktop
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git add -A && git commit -qm "Desktop ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" build-desktop
+      - name: Publicar release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=$(grep -oP 'VERSION = "\K[^"]+' desktop/teyvat_radar/__init__.py)
+          TAG="desktop-v$V"
+          cp desktop/dist/TeyvatRadar.exe "TeyvatRadar-Windows-v$V.exe"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            NOTES=desktop/release-notes/v$V.md
+            [ -f "$NOTES" ] || echo "Teyvat Radar para Windows $V" > "$NOTES"
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Windows v$V" --latest=false \
+              --notes-file "$NOTES" "TeyvatRadar-Windows-v$V.exe"
+          fi
+          # link fixo para a versao mais nova do Windows
+          cp desktop/dist/TeyvatRadar.exe TeyvatRadar-Windows.exe
+          if ! gh release view desktop-latest >/dev/null 2>&1; then
+            gh release create desktop-latest --target "$GITHUB_SHA" --title "Windows (mais recente)" --latest=false \
+              --notes "Sempre a versão mais nova do Teyvat Radar para Windows." TeyvatRadar-Windows.exe
+          else
+            gh release upload desktop-latest TeyvatRadar-Windows.exe --clobber
+          fi

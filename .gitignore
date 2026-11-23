@@ -4,3 +4,8 @@ out/
 *.jks
 *.idsig
 !dist/TeyvatRadar.apk
+desktop/build/
+desktop/dist/
+desktop/*.spec
+desktop/tests/selftest.txt
+__pycache__/
