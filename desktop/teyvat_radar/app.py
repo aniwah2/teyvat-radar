@@ -337,22 +337,29 @@ def selftest(folder):
     return 0 if ok else 1
 
 
+def hard_exit(code):
+    """Encerra na hora. No Windows, a saida normal pode travar esperando threads do Qt/OpenCV."""
+    sys.stdout.flush() if sys.stdout else None
+    if sys.platform == "win32":
+        import ctypes
+        k = ctypes.windll.kernel32
+        k.TerminateProcess(k.GetCurrentProcess(), int(code))
+    os._exit(code)
+
+
 def main():
     if "--selftest" in sys.argv:
-        code = selftest(sys.argv[sys.argv.index("--selftest") + 1])
-        sys.stdout.flush()
-        os._exit(code)            # sem desmontar o Qt (evita travar na saida)
+        hard_exit(selftest(sys.argv[sys.argv.index("--selftest") + 1]))
     win.set_dpi_aware()
     app = QApplication(sys.argv)
     app.setQuitOnLastWindowClosed(False)
     app.setApplicationName("Teyvat Radar")
     if not prepare_data(app):
-        sys.exit(1)
+        hard_exit(1)
     try:
         radar = RadarApp(app)
     except Exception:
         log(traceback.format_exc())
         QMessageBox.critical(None, "Teyvat Radar", "Erro ao iniciar:\n\n" + traceback.format_exc()[-1500:])
         sys.exit(1)
-    code = app.exec()
-    os._exit(code)
+    hard_exit(app.exec())
