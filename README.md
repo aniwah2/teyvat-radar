@@ -5,6 +5,7 @@ Mapa flutuante e transparente que fica **por cima do Genshin Impact** no Android
 ## Download
 
 - **Última versão:** [TeyvatRadar.apk](https://github.com/aniwah2/teyvat-radar/releases/latest/download/TeyvatRadar.apk)
+- **Windows (mais recente):** [TeyvatRadar-Windows.exe](https://github.com/aniwah2/teyvat-radar/releases/download/desktop-latest/TeyvatRadar-Windows.exe)
 - **Todas as versões:** [Releases](https://github.com/aniwah2/teyvat-radar/releases)
 
 ## Como funciona (v0.2.0)
@@ -57,3 +58,11 @@ Segue [SemVer](https://semver.org/lang/pt-BR/). Cada versão tem uma tag `vX.Y.Z
 | 0.3.0 | Radar via Acessibilidade (funciona junto com a gravação de tela), liga sozinho com o jogo, escala mais precisa |
 | 0.2.0 | Radar sobre o mapa do jogo: botão só com o mapa aberto, filtros com ícones, marcadores alinhados |
 | 0.1.0 | Primeira versão: mapa flutuante, transparência, modo fantasma |
+
+## Windows
+
+Programa para PC em `desktop/` (Python + OpenCV + PySide6), com a mesma técnica do app Android. Ele fica na bandeja do Windows e liga sozinho com o Genshin. O botão aparece com o mapa aberto (M), e o minimapa se calibra sozinho na primeira vez que você abre e fecha o mapa. O workflow **Desktop (Windows)** gera o `.exe`, roda um autoteste no Windows e publica a release `desktop-vX.Y.Z`.
+
+| Versão Windows | Novidades |
+| -------------- | --------- |
+| 0.1.0 | Primeira versão: mapa com filtros e ícones; minimapa com calibração automática |
