@@ -294,7 +294,7 @@ def prepare_data(app):
 
 def selftest(folder):
     """Autoteste usado no GitHub Actions: dados, reconhecimento e janelas."""
-    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    # (sem forcar plataforma "offscreen": o .exe so leva a do Windows)
     lines, ok = [], True
     try:
         changed, msg = update_if_needed()
@@ -324,7 +324,6 @@ def selftest(folder):
         ov.grab()
         panel = FilterPanel(d, icons, [])
         panel.resize(1000, 650)
-        panel.show()
         panel._on_cat(0)
         panel._on_search("hili")
         panel.grab()

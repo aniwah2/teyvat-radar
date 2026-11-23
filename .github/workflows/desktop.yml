@@ -27,12 +27,13 @@ jobs:
           --add-data "teyvat_radar/assets;teyvat_radar/assets" run.py
       - name: Autoteste no Windows
         id: test
+        timeout-minutes: 8
         shell: pwsh
         working-directory: desktop
         run: |
-          $p = Start-Process -FilePath "dist\TeyvatRadar.exe" -ArgumentList "--selftest", "$PWD\tests" -Wait -PassThru
+          $p = Start-Process -FilePath "dist\TeyvatRadar.exe" -ArgumentList "--selftest", "$PWD\tests" -PassThru
+          if (-not $p.WaitForExit(300000)) { $p.Kill(); "TEMPO ESGOTADO (5 min)" | Out-File tests\selftest.txt -Append; exit 1 }
           Get-Content tests\selftest.txt
-          "code=$($p.ExitCode)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           if ($p.ExitCode -ne 0) { exit 1 }
       - name: Registro no branch build-desktop
         if: always()
